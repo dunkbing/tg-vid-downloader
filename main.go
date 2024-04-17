@@ -30,6 +30,10 @@ func main() {
 	_, err = b.SetMyCommands(ctx, &bot.SetMyCommandsParams{
 		Commands: []models.BotCommand{
 			{
+				Command:     "start",
+				Description: "Say hello",
+			},
+			{
 				Command:     "download",
 				Description: "Download video with the url",
 			},
@@ -38,12 +42,32 @@ func main() {
 	if err != nil {
 		return
 	}
+	b.RegisterHandler(
+		bot.HandlerTypeMessageText,
+		"/start",
+		bot.MatchTypeExact,
+		func(ctx context.Context, bot_ *bot.Bot, update *models.Update) {
+			bot_.SendMessage(ctx, &bot.SendMessageParams{
+				ChatID: update.Message.Chat.ID,
+				Text:   "Please specify a video url",
+			})
+		},
+	)
+	b.RegisterHandler(
+		bot.HandlerTypeMessageText,
+		"/download",
+		bot.MatchTypeExact,
+		defaultHandler,
+	)
 
 	b.Start(ctx)
 }
 
 func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
 	url_ := update.Message.Text
+	if strings.HasPrefix(url_, "/download ") {
+		url_ = strings.Replace(url_, "/download ", "", 1)
+	}
 	if !isValidUrl(url_) {
 		_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Message.Chat.ID,
@@ -99,6 +123,7 @@ func downloadVideo(url string) (string, error) {
 		return "", fmt.Errorf("error executing yt-dlp: %w", err)
 	}
 
+	// get file name
 	cmd = exec.Command("yt-dlp", "-o", "%(title)s.%(ext)s", "--print", "filename", url)
 	stdOut, _ := cmd.CombinedOutput()
 	filepath := string(stdOut)
